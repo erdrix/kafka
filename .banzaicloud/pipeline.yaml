@@ -1,0 +1,88 @@
+cluster:
+  action: GetCluster
+  cloud: google
+  name: i8fwmmt0g8y14
+pipeline:
+  package_zookeeper:
+    image: lachlanevenson/k8s-helm:v2.16.1
+    commands:
+    - helm init -c
+    - helm package ./.banzaicloud/charts/zookeeper
+  deploy_zk:
+    action: EnsureDeployment
+    deployment:
+      name: ./zookeeper-0.0.1.tgz
+      namespace: zookeeper
+      releaseName: '{{ .CICD_REPO_NAME }}-zk'
+      values:
+        cluster:
+          size: null
+    image: banzaicloud/ci-pipeline-client:0.12
+  package_cert_manager:
+    image: lachlanevenson/k8s-helm:v2.16.1
+    commands:
+    - helm init -c
+    - helm package ./.banzaicloud/charts/certmanager
+  deploy_cert_manager:
+    image: banzaicloud/ci-pipeline-client:0.12
+    action: EnsureDeployment
+    deployment:
+      name: ./certmanager-0.1.0.tgz
+      releaseName: '{{ .CICD_REPO_NAME }}-certmanager'
+      namespace: cert-manager
+  deploy_kafka_operator:
+    image: banzaicloud/ci-pipeline-client:0.12
+    action: EnsureDeployment
+    deployment:
+      name: banzaicloud-stable/kafka-operator
+      version: 0.2.4
+      releaseName: '{{ .CICD_REPO_NAME }}-kafka-operator'
+      namespace: kafka
+  package_pixy:
+    image: lachlanevenson/k8s-helm:v2.16.1
+    commands:
+    - helm init -c
+    - helm package ./.banzaicloud/charts/kafka-pixy
+  deploy_pixy:
+    action: EnsureDeployment
+    deployment:
+      name: ./kafka-pixy-0.1.0.tgz
+      namespace: kafka
+      releaseName: '{{ .CICD_REPO_NAME }}-pixy'
+      values:
+        banzaicloud:
+          pixy:
+            enabled: true
+    image: banzaicloud/ci-pipeline-client:0.12
+  package_kafka:
+    image: lachlanevenson/k8s-helm:v2.16.1
+    commands:
+    - helm init -c
+    - helm package ./.banzaicloud/charts/spotguide-kafka
+  deploy_kafka:
+    action: EnsureDeployment
+    deployment:
+      name: ./spotguide-kafka-1.0.1.tgz
+      namespace: kafka
+      releaseName: '{{ .CICD_REPO_NAME }}'
+      values:
+        banzaicloud:
+          pixy:
+            enabled: true
+          ui:
+            enabled: false
+        brokers:
+          disk:
+            size: 10Gi
+          oneBrokerPerNode: true
+          rackAwareness: false
+          readonlyconfig: |
+            auto.create.topics.enable=false
+          replicas: 3
+          ssl:
+            mechanism: None
+        image:
+          tag: 2.12-2.3.0
+        schemaRegistry:
+          enabled: true
+    image: banzaicloud/ci-pipeline-client:0.12
